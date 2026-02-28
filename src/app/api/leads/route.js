@@ -5,7 +5,11 @@ import OpenAI from 'openai';
 const MAPS_API_KEY = process.env.MAPS_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+// Optional: only initialize if key exists, avoiding build crashes
+let openai;
+if (OPENAI_API_KEY && OPENAI_API_KEY !== 'dummy_key_for_build') {
+  openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+}
 
 // Haversine distance formula (returns distance in km)
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -42,7 +46,7 @@ async function generateEmailAndPrompt(business) {
   const hasWebsite = !!website;
   const category = (types && types.length > 0 ? types[0] : 'business').replace(/_/g, ' ');
 
-  if (!OPENAI_API_KEY) {
+  if (!openai) {
     let emailContent = '';
     const description = `${name} is a local ${category} in ${vicinity}. Currently, no detailed AI description is available as the OpenAI API key is missing.`;
     if (!hasWebsite) {
