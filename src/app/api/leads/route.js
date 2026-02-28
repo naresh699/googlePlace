@@ -1,13 +1,21 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const MAPS_API_KEY = process.env.MAPS_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// Optional: only initialize if key exists, avoiding build crashes
+// Initialize Google Gemini
+let genAI;
+if (GEMINI_API_KEY && GEMINI_API_KEY !== 'your_gemini_api_key_here' && !GEMINI_API_KEY.includes('your_')) {
+  genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+}
+
+// Initialize OpenAI (Fallback)
 let openai;
-if (OPENAI_API_KEY && OPENAI_API_KEY !== 'dummy_key_for_build') {
+if (OPENAI_API_KEY && OPENAI_API_KEY !== 'dummy_key_for_build' && !OPENAI_API_KEY.includes('your_')) {
   openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 }
 
@@ -46,18 +54,6 @@ async function generateEmailAndPrompt(business) {
   const hasWebsite = !!website;
   const category = (types && types.length > 0 ? types[0] : 'business').replace(/_/g, ' ');
 
-  if (!openai) {
-    let emailContent = '';
-    const description = `${name} is a local ${category} in ${vicinity}. Currently, no detailed AI description is available as the OpenAI API key is missing.`;
-    if (!hasWebsite) {
-      emailContent = `Subject: Digital Transformation for ${name}\n\nDear ${name} Team,\n\nI noticed you don't have a website for your ${category} business in ${vicinity}. We specialize in building high-converting sites.`;
-    } else {
-      emailContent = `Subject: SEO Optimization for ${name}\n\nDear ${name} Team,\n\nI visited your website at ${website} and noticed some areas for optimization.`;
-    }
-    const antigravityPrompt = `Create a website for ${name} (${category}) in ${vicinity}. Sections: Hero, Services, Contact.`;
-    return { emailContent, antigravityPrompt, hasWebsite, description };
-  }
-
   const prompt = `
     Business Name: ${name}
     Category: ${category}
@@ -77,32 +73,63 @@ async function generateEmailAndPrompt(business) {
        
     3. Generate a 150-200 word 'description' summarizing the presumed nature of the business, facility, or institution based on its name and category.
 
-    Format the response as a JSON object with keys: "email", "antigravityPrompt", and "description".
+    Format the response strictly as a JSON object with keys: "email", "antigravityPrompt", and "description". Do not include markdown formatting like \`\`\`json.
   `;
 
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-    });
+  // --- Try Google Gemini First ---
+  if (genAI) {
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
 
-    const result = JSON.parse(response.choices[0].message.content || '{}');
-    return {
-      emailContent: result.email,
-      antigravityPrompt: result.antigravityPrompt,
-      hasWebsite,
-      description: result.description || "Description unavailable.",
-    };
-  } catch (error) {
-    console.error('OpenAI error:', error);
-    return {
-      emailContent: 'Error generating email.',
-      antigravityPrompt: 'Error generating prompt.',
-      hasWebsite,
-      description: 'Error generating description.',
-    };
+      // Clean the text from potential markdown
+      const cleanedText = text.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(cleanedText);
+
+      return {
+        emailContent: parsed.email,
+        antigravityPrompt: parsed.antigravityPrompt,
+        hasWebsite,
+        description: parsed.description || "Description unavailable.",
+      };
+    } catch (error) {
+      console.error('Gemini error:', error);
+      // If Gemini fails, we'll try OpenAI or fallback
+    }
   }
+
+  // --- Fallback to OpenAI ---
+  if (openai) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+      });
+
+      const result = JSON.parse(response.choices[0].message.content || '{}');
+      return {
+        emailContent: result.email,
+        antigravityPrompt: result.antigravityPrompt,
+        hasWebsite,
+        description: result.description || "Description unavailable.",
+      };
+    } catch (error) {
+      console.error('OpenAI error:', error);
+    }
+  }
+
+  // --- Final Static Fallback ---
+  let emailContent = '';
+  const description = `${name} is a local ${category} in ${vicinity}. No detailed AI description is currently available.`;
+  if (!hasWebsite) {
+    emailContent = `Subject: Digital Transformation for ${name}\n\nDear ${name} Team,\n\nI noticed you don't have a website for your ${category} business in ${vicinity}. We specialize in building high-converting sites.`;
+  } else {
+    emailContent = `Subject: SEO Optimization for ${name}\n\nDear ${name} Team,\n\nI visited your website at ${website} and noticed some areas for optimization.`;
+  }
+  const antigravityPrompt = `Create a website for ${name} (${category}) in ${vicinity}. Sections: Hero, Services, Contact.`;
+  return { emailContent, antigravityPrompt, hasWebsite, description };
 }
 
 export async function POST(req) {

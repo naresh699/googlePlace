@@ -10,6 +10,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@hcaptcha/react-hcaptcha": "^2.0.2",
     "@prisma/client": "^6.19.2",
     "@react-google-maps/api": "^2.20.8",
