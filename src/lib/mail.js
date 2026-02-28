@@ -1,7 +1,8 @@
 import nodemailer from "nodemailer";
 
 export async function sendVerificationEmail(email, token) {
-    const verificationUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/verify-email?token=${token}`;
+    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const verificationUrl = `${baseUrl}/api/verify-email?token=${token}`;
 
     const mailOptions = {
         from: process.env.EMAIL_FROM || "noreply@example.com",
