@@ -11,7 +11,7 @@ export const authOptions = {
                 username: { label: "Username", type: "text", placeholder: "jsmith" },
                 password: { label: "Password", type: "password" }
             },
-            async authorize(credentials, req) {
+            async authorize(credentials) {
                 if (!credentials?.username || !credentials?.password) {
                     throw new Error("Missing username or email/password");
                 }
