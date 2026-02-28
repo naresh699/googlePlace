@@ -12,5 +12,6 @@ export default defineConfig({
   engine: "classic",
   datasource: {
     url: process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL || "",
+    directUrl: process.env.POSTGRES_URL_NON_POOLING,
   },
 });
