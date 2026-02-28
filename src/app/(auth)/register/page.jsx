@@ -14,6 +14,7 @@ export default function Register() {
     });
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [error, setError] = useState("");
     const [successMessage, setSuccessMessage] = useState("");
     const [verificationUrl, setVerificationUrl] = useState("");
     const [loading, setLoading] = useState(false);
