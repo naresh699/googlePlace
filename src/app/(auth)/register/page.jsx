@@ -14,8 +14,8 @@ export default function Register() {
     });
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [error, setError] = useState("");
     const [successMessage, setSuccessMessage] = useState("");
+    const [verificationUrl, setVerificationUrl] = useState("");
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e) => {
@@ -26,6 +26,7 @@ export default function Register() {
         e.preventDefault();
         setError("");
         setSuccessMessage("");
+        setVerificationUrl("");
         setLoading(true);
 
         if (formData.password !== formData.confirmPassword) {
@@ -52,7 +53,12 @@ export default function Register() {
                 throw new Error(data.message || "Something went wrong");
             }
 
-            setSuccessMessage("Registration successful! Please check your email to verify your account.");
+            setSuccessMessage(data.message || "Registration successful! Please check your email to verify your account.");
+
+            if (data.verificationUrl) {
+                setVerificationUrl(data.verificationUrl);
+            }
+
             setFormData({ name: "", email: "", username: "", password: "", confirmPassword: "" });
             // Optional: router.push('/login') after a delay
         } catch (err) {
@@ -102,11 +108,26 @@ export default function Register() {
                             </div>
                         )}
                         {successMessage && (
-                            <div className="bg-emerald-50 border border-emerald-100 text-emerald-600 px-5 py-4 rounded-2xl text-sm font-bold flex items-center gap-3">
-                                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                                </svg>
-                                {successMessage}
+                            <div className="bg-emerald-50 border border-emerald-100 text-emerald-600 px-5 py-4 rounded-2xl text-sm font-bold space-y-3">
+                                <div className="flex items-center gap-3">
+                                    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    {successMessage}
+                                </div>
+                                {verificationUrl && (
+                                    <div className="mt-4 p-4 bg-white border border-emerald-200 rounded-xl text-xs break-all">
+                                        <p className="mb-2 text-emerald-800 uppercase tracking-widest font-black">Development Link:</p>
+                                        <a
+                                            href={verificationUrl}
+                                            className="text-indigo-600 hover:underline"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            {verificationUrl}
+                                        </a>
+                                    </div>
+                                )}
                             </div>
                         )}
 

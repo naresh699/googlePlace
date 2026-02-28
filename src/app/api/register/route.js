@@ -62,10 +62,34 @@ export async function POST(req) {
         });
 
         // Send Verification Email
-        await sendVerificationEmail(normalizedEmail, token);
+        const emailResult = await sendVerificationEmail(normalizedEmail, token);
+
+        if (!emailResult.success) {
+            console.error("Failed to send verification email:", emailResult.error);
+            // Optionally, we could delete the user here, but for now we'll just inform the user
+            return NextResponse.json(
+                {
+                    message: "User created, but we couldn't send the verification email. Please contact support.",
+                    error: emailResult.error
+                },
+                { status: 201 }
+            );
+        }
+
+        // Return the verification URL in simulation mode for easier development
+        if (emailResult.simulation) {
+            return NextResponse.json(
+                {
+                    message: "User created successfully. (EMAIL SIMULATION MODE)",
+                    verificationUrl: emailResult.url,
+                    info: "No real email was sent because SMTP is not configured. Use the link below to verify manually."
+                },
+                { status: 201 }
+            );
+        }
 
         return NextResponse.json(
-            { message: "User created successfully. Please verify your email." },
+            { message: "User created successfully. Please check your email to verify your account." },
             { status: 201 }
         );
     } catch (error) {
