@@ -1,0 +1,39 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "==========================================="
+echo "Running pre-commit hook: Verifying Build..."
+echo "==========================================="
+
+# Try to pull environment variables (non-fatal if it fails)
+echo "\n-> Pulling environment variables..."
+npx vercel env pull .env.development.local || echo "Warning: Could not pull Vercel envs. Proceeding with existing env files."
+
+# Run Linter
+echo "\n-> Running ESLint..."
+npm run lint
+if [ $? -ne 0 ]; then
+  echo "❌ ESLint failed. Please fix linting errors before committing."
+  exit 1
+fi
+
+# Validate Prisma Schema
+echo "\n-> Validating Prisma Schema..."
+npx prisma validate
+if [ $? -ne 0 ]; then
+  echo "❌ Prisma schema validation failed. Please fix your schema.prisma."
+  exit 1
+fi
+
+# Run Production Build
+echo "\n-> Running Strict Next.js Production Build..."
+npm run build
+if [ $? -ne 0 ]; then
+  echo "❌ Production build failed!"
+  echo "Please fix the build errors above before committing your code."
+  exit 1
+fi
+
+echo "\n✅ All checks passed! Proceeding with commit..."
+echo "==========================================="
+exit 0
