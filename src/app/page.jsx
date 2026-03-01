@@ -420,6 +420,7 @@ export default function Home() {
                     <div className="mt-6 pt-4 border-t border-slate-50">
                       <button
                         onClick={() => {
+                          setSelectedLeadForDetails(lead);
                           handleEdit(lead);
                           if (lead.description?.includes('Click "Summarize"')) {
                             handleSummarize(lead.id);
@@ -509,7 +510,10 @@ export default function Home() {
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Business Profile</h3>
                 <button
-                  onClick={() => setSelectedLeadForDetails(null)}
+                  onClick={() => {
+                    setSelectedLeadForDetails(null);
+                    setEditingLead(null);
+                  }}
                   className="p-2 text-slate-400 hover:text-slate-900 transition-colors bg-white rounded-xl shadow-sm border border-slate-200"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -595,20 +599,77 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Footer Actions */}
+              {/* Footer Actions / Editing State */}
               <div className="p-8 border-t border-slate-100 space-y-3">
-                <button
-                  onClick={() => {
-                    handleEdit(selectedLeadForDetails);
-                    if (selectedLeadForDetails.description.includes('Click "Summarize"')) {
-                      handleSummarize(selectedLeadForDetails.id);
-                    }
-                  }}
-                  className="w-full bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-[#4D3DF7] transition-all shadow-xl active:scale-95"
-                >
-                  Start Outreach
-                </button>
-                <p className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Personalize with AI before sending</p>
+                {editingLead && editingLead.id === selectedLeadForDetails.id ? (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div>
+                      <h4 className="text-lg font-black text-slate-900">Refine Outreach</h4>
+                      <p className="text-xs text-slate-500 mt-1">Review and modify the generated content</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Draft</label>
+                        <div className="relative">
+                          <textarea
+                            value={editingLead.email}
+                            onChange={(e) => setEditingLead({ ...editingLead, email: e.target.value })}
+                            placeholder={summarizingIds.has(editingLead.id) ? "Generating personalized email..." : "Write your email here..."}
+                            className={`w-full h-40 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-slate-700 text-sm leading-relaxed ${summarizingIds.has(editingLead.id) ? 'opacity-50' : ''}`}
+                          />
+                          {summarizingIds.has(editingLead.id) && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-6 h-6 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Antigravity AI Prompt</label>
+                        <div className="relative">
+                          <textarea
+                            value={editingLead.antigravityPrompt}
+                            onChange={(e) => setEditingLead({ ...editingLead, antigravityPrompt: e.target.value })}
+                            placeholder={summarizingIds.has(editingLead.id) ? "Generating AI prompt..." : "Write your prompt here..."}
+                            className={`w-full h-24 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-slate-600 font-mono text-xs leading-relaxed ${summarizingIds.has(editingLead.id) ? 'opacity-50' : ''}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={() => setEditingLead(null)}
+                        className="flex-1 py-3 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={saveEdit}
+                        className="flex-1 py-3 text-sm font-bold bg-[#4D3DF7] text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md active:scale-95"
+                      >
+                        Save Details
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {
+                        handleEdit(selectedLeadForDetails);
+                        if (selectedLeadForDetails.description.includes('Click "Summarize"')) {
+                          handleSummarize(selectedLeadForDetails.id);
+                        }
+                      }}
+                      className="w-full bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-[#4D3DF7] transition-all shadow-xl active:scale-95"
+                    >
+                      Start Outreach
+                    </button>
+                    <p className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Personalize with AI before sending</p>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -618,72 +679,11 @@ export default function Home() {
         {selectedLeadForDetails && (
           <div
             className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[140] transition-opacity duration-300"
-            onClick={() => setSelectedLeadForDetails(null)}
+            onClick={() => {
+              setSelectedLeadForDetails(null);
+              setEditingLead(null);
+            }}
           />
-        )}
-
-        {/* Edit Modal */}
-        {editingLead && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
-            <div className="bg-white rounded-[2rem] shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
-              <div className="p-10 space-y-8 overflow-y-auto max-h-[90vh]">
-                <div className="flex justify-between items-start border-b border-slate-100 pb-6">
-                  <div>
-                    <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Refine Outreach</h3>
-                    <p className="text-slate-500 font-medium mt-1">Personalizing message for <span className="text-indigo-600 font-bold">{editingLead.name}</span></p>
-                  </div>
-                  <button onClick={() => setEditingLead(null)} className="text-slate-400 hover:text-slate-900 p-2 transition-colors">
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Email Outreach Draft</label>
-                    <div className="relative">
-                      <textarea
-                        value={editingLead.email}
-                        onChange={(e) => setEditingLead({ ...editingLead, email: e.target.value })}
-                        placeholder={summarizingIds.has(editingLead.id) ? "Generating personalized email..." : "Write your email here..."}
-                        className={`w-full h-48 px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-slate-700 leading-relaxed font-medium ${summarizingIds.has(editingLead.id) ? 'opacity-50' : ''}`}
-                      />
-                      {summarizingIds.has(editingLead.id) && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Antigravity AI Builder Prompt</label>
-                    <div className="relative">
-                      <textarea
-                        value={editingLead.antigravityPrompt}
-                        onChange={(e) => setEditingLead({ ...editingLead, antigravityPrompt: e.target.value })}
-                        placeholder={summarizingIds.has(editingLead.id) ? "Generating AI prompt..." : "Write your prompt here..."}
-                        className={`w-full h-32 px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-slate-600 font-mono text-xs leading-relaxed ${summarizingIds.has(editingLead.id) ? 'opacity-50' : ''}`}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-4 pt-4">
-                  <button
-                    onClick={() => setEditingLead(null)}
-                    className="px-8 py-3 text-sm font-bold text-slate-500 hover:bg-slate-50 rounded-2xl transition-all"
-                  >
-                    Dismiss
-                  </button>
-                  <button
-                    onClick={saveEdit}
-                    className="px-8 py-3 text-sm font-bold bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100"
-                  >
-                    Save Modifications
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
         )}
       </div>
     </div>
