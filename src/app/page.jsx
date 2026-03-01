@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 
 const COUNTRIES = [
   "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czechia", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"
@@ -20,6 +20,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [postalError, setPostalError] = useState('');
   const itemsPerPage = 10;
 
   const [filter, setFilter] = useState('all');
@@ -29,34 +31,93 @@ export default function Home() {
   const [activeMarker, setActiveMarker] = useState(null);
   const [mapZoom, setMapZoom] = useState(12);
   const [summarizingIds, setSummarizingIds] = useState(new Set());
+  const [savingIds, setSavingIds] = useState(new Set());
+  const [savedLeadIds, setSavedLeadIds] = useState(new Set());
 
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: process.env.NEXT_PUBLIC_MAPS_API_KEY || process.env.MAPS_API_KEY || "",
-  });
+  const mapApiKey = process.env.NEXT_PUBLIC_MAPS_API_KEY || process.env.MAPS_API_KEY || "";
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
     }
 
-    // Auto-detect country based on IP
-    const fetchCountry = async () => {
+    if (status === 'authenticated' && !isInitialized) {
+      // Try to load saved state from localStorage
       try {
-        const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
-        const data = await res.json();
-        if (data.country && COUNTRIES.includes(data.country)) {
-          setCountry(data.country);
+        const savedState = localStorage.getItem('leadGenProState');
+        if (savedState) {
+          const parsed = JSON.parse(savedState);
+          if (parsed.country) setCountry(parsed.country);
+          if (parsed.postalCode) setPostalCode(parsed.postalCode);
+          if (parsed.radius) setRadius(parsed.radius);
+          if (parsed.leads && Array.isArray(parsed.leads)) {
+            setLeads(parsed.leads);
+          }
+          setIsInitialized(true);
+          return;
         }
-      } catch (e) {
-        console.error("Failed to detect country", e);
+      } catch (err) {
+        console.error("Failed to load state from localStorage", err);
       }
-    };
-    fetchCountry();
-  }, [status, router]);
+
+      // Auto-detect country based on IP if no saved state
+      const fetchCountry = async () => {
+        try {
+          const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
+          const data = await res.json();
+          if (data.country && COUNTRIES.includes(data.country)) {
+            setCountry(data.country);
+          }
+        } catch (e) {
+          console.error("Failed to detect country", e);
+        }
+      };
+      fetchCountry();
+      setIsInitialized(true);
+    }
+  }, [status, router, isInitialized]);
+
+  // Save to localStorage whenever important state changes
+  useEffect(() => {
+    if (isInitialized && status === 'authenticated') {
+      try {
+        localStorage.setItem('leadGenProState', JSON.stringify({
+          country,
+          postalCode,
+          radius,
+          leads
+        }));
+      } catch (err) {
+        console.error("Failed to save state to localStorage", err);
+      }
+    }
+  }, [country, postalCode, radius, leads, isInitialized, status]);
 
   const fetchLeads = async (e) => {
     e.preventDefault();
+    if (!postalCode.trim() || !radius) return;
+
+    // Postal code validation logic based on country
+    const patterns = {
+      'United States': /^\d{5}(-\d{4})?$/, // US ZIP code (e.g. 12345 or 12345-6789)
+      'United Kingdom': /^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/i, // UK Postcode
+      'Canada': /^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/, // Canadian Postal Code
+      'Australia': /^\d{4}$/, // AU Postcode
+      'India': /^[1-9][0-9]{5}$/, // Indian PIN code
+      'Germany': /^\d{5}$/,
+      'France': /^\d{5}$/,
+      'Spain': /^(?:0[1-9]|[1-4]\d|5[0-2])\d{3}$/,
+      'Italy': /^\d{5}$/,
+      'Brazil': /^\d{5}-\d{3}$/
+    };
+
+    const pattern = patterns[country];
+    if (pattern && !pattern.test(postalCode.trim())) {
+      setPostalError(`Please enter a valid postal code for ${country}.`);
+      return;
+    }
+    setPostalError(''); // clear error if valid
+
     setLoading(true);
     setLeads([]);
     setActiveMarker(null);
@@ -111,6 +172,31 @@ export default function Home() {
       setSummarizingIds(prev => {
         const next = new Set(prev);
         next.delete(leadId);
+        return next;
+      });
+    }
+  };
+
+  const handleSaveLead = async (lead) => {
+    if (savingIds.has(lead.id) || savedLeadIds.has(lead.id)) return;
+
+    setSavingIds(prev => new Set(prev).add(lead.id));
+    try {
+      const response = await fetch('/api/leads/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to save lead');
+
+      setSavedLeadIds(prev => new Set(prev).add(lead.id));
+    } catch (error) {
+      alert("Failed to save lead: " + error.message);
+    } finally {
+      setSavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(lead.id);
         return next;
       });
     }
@@ -193,24 +279,11 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-4">
             <button
-              onClick={syncToSheets}
-              disabled={leads.length === 0 || syncing}
-              className={`px-8 py-3 rounded-full font-bold shadow-xl transition-all flex items-center gap-3 transform active:scale-95 ${leads.length === 0 || syncing
-                ? 'bg-white/10 text-white/50 cursor-not-allowed border border-white/20'
-                : 'bg-white text-indigo-700 hover:bg-indigo-50 hover:shadow-2xl'
-                }`}
+              onClick={() => router.push('/pipeline')}
+              className="px-8 py-3 rounded-full font-bold shadow-xl transition-all flex items-center gap-3 bg-white text-indigo-700 hover:bg-indigo-50 hover:shadow-2xl transform active:scale-95 border-2 border-transparent hover:border-indigo-100"
             >
-              {syncing ? (
-                <>
-                  <div className="w-5 h-5 border-3 border-indigo-200 border-t-indigo-700 rounded-full animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                  Sync to Sheets
-                </>
-              )}
+              <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+              My Pipeline
             </button>
             <button
               onClick={handleLogout}
@@ -247,15 +320,21 @@ export default function Home() {
                 </div>
               </div>
               <div className="flex-1 space-y-3 w-full">
-                <label className="block text-sm font-bold text-slate-700 uppercase tracking-wider">Postal Code</label>
-                <input
-                  type="text"
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all text-slate-800 font-medium text-lg placeholder:text-slate-400"
-                  placeholder="e.g. 90210"
-                  required
-                />
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Postal/Zip Code</label>
+                  <input
+                    type="text"
+                    required
+                    value={postalCode}
+                    onChange={(e) => {
+                      setPostalCode(e.target.value);
+                      setPostalError(''); // Clear error when typing
+                    }}
+                    placeholder="e.g. 10001"
+                    className={`w-full bg-slate-50 border ${postalError ? 'border-red-400 focus:ring-red-100 focus:border-red-500' : 'border-slate-200 focus:ring-indigo-100 focus:border-indigo-400'} rounded-xl px-4 py-3 placeholder:text-slate-400 text-slate-800 font-bold outline-none transition-all shadow-sm`}
+                  />
+                  {postalError && <p className="text-red-500 text-xs font-bold mt-1.5">{postalError}</p>}
+                </div>
               </div>
               <button
                 type="submit"
@@ -417,7 +496,7 @@ export default function Home() {
                       </div>
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-slate-50">
+                    <div className="mt-6 pt-4 border-t border-slate-50 flex gap-3">
                       <button
                         onClick={() => {
                           setSelectedLeadForDetails(lead);
@@ -426,10 +505,36 @@ export default function Home() {
                             handleSummarize(lead.id);
                           }
                         }}
-                        className="w-full bg-slate-900 text-white py-3 rounded-xl text-sm font-bold hover:bg-[#4D3DF7] transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+                        className="flex-1 bg-slate-900 text-white py-3 rounded-xl text-sm font-bold hover:bg-[#4D3DF7] transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
                         Outreach
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSaveLead(lead);
+                        }}
+                        disabled={savedLeadIds.has(lead.id) || savingIds.has(lead.id)}
+                        className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 border ${savedLeadIds.has(lead.id)
+                          ? 'bg-emerald-50 text-emerald-600 border-emerald-200 cursor-default'
+                          : 'bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300'
+                          }`}
+                      >
+                        {savingIds.has(lead.id) ? (
+                          <div className="w-3.5 h-3.5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                        ) : savedLeadIds.has(lead.id) ? (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
+                            Save Lead
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -464,31 +569,33 @@ export default function Home() {
             {/* Map Column (30%) */}
             <div className="lg:col-span-3 sticky top-8">
               <div className="w-full h-[600px] bg-slate-100 rounded-3xl shadow-xl overflow-hidden border border-slate-200">
-                {isLoaded ? (
-                  <GoogleMap
-                    mapContainerStyle={{ width: '100%', height: '100%' }}
-                    center={mapCenter}
-                    zoom={mapZoom}
-                    options={{
-                      disableDefaultUI: false,
-                      zoomControl: true,
-                      styles: [
+                {mapApiKey ? (
+                  <APIProvider apiKey={mapApiKey}>
+                    <Map
+                      style={{ width: '100%', height: '100%' }}
+                      defaultCenter={mapCenter}
+                      defaultZoom={mapZoom}
+                      center={mapCenter}
+                      zoom={mapZoom}
+                      mapId="DEMO_MAP_ID"
+                      disableDefaultUI={false}
+                      zoomControl={true}
+                      styles={[
                         {
                           featureType: "poi",
                           elementType: "labels",
                           stylers: [{ visibility: "off" }]
                         }
-                      ]
-                    }}
-                  >
-                    {currentLeads.map((lead) => (
-                      <Marker
-                        key={lead.id}
-                        position={{ lat: lead.lat, lng: lead.lng }}
-                        animation={activeMarker?.id === lead.id ? 1 : null} // 1 = BOUNCE in google maps api
-                      />
-                    ))}
-                  </GoogleMap>
+                      ]}
+                    >
+                      {currentLeads.map((lead) => (
+                        <AdvancedMarker
+                          key={lead.id}
+                          position={{ lat: lead.lat, lng: lead.lng }}
+                        />
+                      ))}
+                    </Map>
+                  </APIProvider>
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 font-bold gap-3">
                     <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
@@ -686,6 +793,6 @@ export default function Home() {
           />
         )}
       </div>
-    </div>
+    </div >
   );
 }

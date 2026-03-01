@@ -16,6 +16,7 @@
     "@prisma/client": "^6.19.2",
     "@react-google-maps/api": "^2.20.8",
     "@supabase/supabase-js": "^2.98.0",
+    "@vis.gl/react-google-maps": "^1.7.1",
     "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
     "git": "^0.1.5",

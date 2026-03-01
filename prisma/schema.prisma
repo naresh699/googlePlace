@@ -21,6 +21,7 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  savedLeads    SavedLead[]
 }
 
 model VerificationToken {
@@ -29,4 +30,40 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model SavedLead {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  placeId             String
+  name                String
+  address             String?
+  category            String?
+  phone               String?
+  website             String?
+  description         String?  @db.Text
+  distance            Float?
+
+  // CRM Fields
+  qualificationStatus String   @default("Consider") // 'Consider', 'Skip'
+  communicationStatus String   @default("Pending")  // 'Pending', 'Email Sent', 'Phone Call Done', 'In-Person Meeting'
+  leadOutcome         String   @default("In Progress") // 'In Progress', 'Yes', 'No'
+  complexityScore     Int      @default(0) // 1 to 10
+  pricingEstimate     String   @default("")
+  notes               String?  @db.Text
+
+  // CRM Event Timestamps
+  calledAt            DateTime?
+  metAt               DateTime?
+  leadGeneratedAt     DateTime?
+  workStartedAt       DateTime?
+  projectDeliveredAt  DateTime?
+  closedAt            DateTime?
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([userId, placeId])
+  @@index([userId])
 }

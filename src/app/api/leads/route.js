@@ -99,7 +99,7 @@ export async function POST(req) {
           };
         })
       );
-      enrichedLeads.push(...enrichedBatch);
+      enrichedLeads.push(...enrichedBatch.filter(lead => lead.distance <= radius));
     }
 
     return NextResponse.json(enrichedLeads);
