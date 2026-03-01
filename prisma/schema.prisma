@@ -19,9 +19,22 @@ model User {
   password      String?
   emailVerified DateTime?
   image         String?
+  role          Role      @default(USER)
+  status        Status    @default(PENDING)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   savedLeads    SavedLead[]
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Status {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model VerificationToken {

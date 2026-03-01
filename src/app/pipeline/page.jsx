@@ -107,10 +107,18 @@ export default function PipelinePage() {
                 <div className="max-w-7xl mx-auto px-6 py-8">
                     <div className="flex justify-between items-end relative z-10">
                         <div>
-                            <button onClick={() => router.push('/')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 mb-4 flex items-center gap-1 transition-colors">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                                Back to Search
-                            </button>
+                            <div className="flex items-center gap-4 mb-4">
+                                <button onClick={() => router.push('/')} className="text-sm font-bold text-slate-400 hover:text-indigo-600 flex items-center gap-1 transition-colors">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                                    Back to Search
+                                </button>
+                                {session?.user?.role === 'ADMIN' && (
+                                    <button onClick={() => router.push('/admin')} className="text-sm font-bold text-indigo-400 hover:text-indigo-600 flex items-center gap-1 transition-colors bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                        Admin
+                                    </button>
+                                )}
+                            </div>
                             <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight flex items-center gap-4">
                                 My Pipeline
                                 <span className="bg-indigo-100 text-indigo-700 text-sm py-1 px-3 rounded-full border border-indigo-200 shadow-sm">
@@ -290,10 +298,10 @@ export default function PipelinePage() {
 
                                 <div className="flex flex-wrap gap-3">
                                     {[
-                                        { label: 'Pending', color: 'red' },
-                                        { label: 'Email Sent', color: 'blue' },
-                                        { label: 'Phone Call Done', color: 'emerald' },
-                                        { label: 'In-Person Meeting', color: 'indigo' }
+                                        { label: 'Pending', hoverClass: 'hover:border-red-300 hover:bg-red-50 hover:text-red-700' },
+                                        { label: 'Email Sent', hoverClass: 'hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700' },
+                                        { label: 'Phone Call Done', hoverClass: 'hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700' },
+                                        { label: 'In-Person Meeting', hoverClass: 'hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700' }
                                     ].map(status => {
                                         const isActive = selectedLead.communicationStatus === status.label;
                                         return (
@@ -301,8 +309,8 @@ export default function PipelinePage() {
                                                 key={status.label}
                                                 onClick={() => updateLead(selectedLead.id, { communicationStatus: status.label })}
                                                 className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all border-2 ${isActive
-                                                    ? `bg-${status.color}-500 border-${status.color}-500 text-white shadow-md transform scale-105`
-                                                    : `bg-white border-slate-200 text-slate-500 hover:border-${status.color}-300 hover:bg-${status.color}-50 hover:text-${status.color}-700`
+                                                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-md transform scale-105'
+                                                    : `bg-white border-slate-200 text-slate-500 ${status.hoverClass}`
                                                     }`}
                                             >
                                                 {status.label}
@@ -337,9 +345,18 @@ export default function PipelinePage() {
                                                 type="range"
                                                 min="0" max="10"
                                                 value={selectedLead.complexityScore}
-                                                onChange={(e) => updateLead(selectedLead.id, {
+                                                onChange={(e) => setSelectedLead({
+                                                    ...selectedLead,
                                                     complexityScore: parseInt(e.target.value),
                                                     pricingEstimate: calculatePrice(parseInt(e.target.value))
+                                                })}
+                                                onMouseUp={() => updateLead(selectedLead.id, {
+                                                    complexityScore: selectedLead.complexityScore,
+                                                    pricingEstimate: selectedLead.pricingEstimate
+                                                })}
+                                                onTouchEnd={() => updateLead(selectedLead.id, {
+                                                    complexityScore: selectedLead.complexityScore,
+                                                    pricingEstimate: selectedLead.pricingEstimate
                                                 })}
                                                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#4D3DF7]"
                                             />
@@ -356,10 +373,24 @@ export default function PipelinePage() {
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Internal Notes / Requirements</label>
                                         <textarea
                                             value={selectedLead.notes || ''}
-                                            onChange={(e) => updateLead(selectedLead.id, { notes: e.target.value })}
+                                            onChange={(e) => setSelectedLead({ ...selectedLead, notes: e.target.value })}
                                             placeholder="e.g. They need a custom e-commerce flow with 3 animated pages..."
                                             className="w-full h-24 px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all text-slate-700 text-sm font-medium leading-relaxed resize-none shadow-sm"
                                         />
+                                        <div className="flex gap-2 justify-end mt-2">
+                                            <button
+                                                onClick={() => setSelectedLead({ ...selectedLead, notes: leads.find(l => l.id === selectedLead.id)?.notes || '' })}
+                                                className="px-4 py-2 text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 hover:text-slate-700 rounded-lg transition-colors"
+                                            >
+                                                Clear / Cancel
+                                            </button>
+                                            <button
+                                                onClick={() => updateLead(selectedLead.id, { notes: selectedLead.notes })}
+                                                className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm"
+                                            >
+                                                Save Notes
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </section>

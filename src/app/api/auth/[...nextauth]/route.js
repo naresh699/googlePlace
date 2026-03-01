@@ -49,11 +49,17 @@ export const authOptions = {
                     throw new Error("Please verify your email to login.");
                 }
 
+                if (user.status !== "APPROVED") {
+                    throw new Error("Your account is pending admin approval.");
+                }
+
                 return {
                     id: user.id,
                     name: user.name,
                     email: user.email,
                     username: user.username,
+                    role: user.role,
+                    status: user.status
                 };
             }
         })
@@ -63,6 +69,8 @@ export const authOptions = {
             if (user) {
                 token.id = user.id;
                 token.username = user.username;
+                token.role = user.role;
+                token.status = user.status;
             }
             return token;
         },
@@ -70,6 +78,8 @@ export const authOptions = {
             if (token && session.user) {
                 session.user.id = token.id;
                 session.user.username = token.username;
+                session.user.role = token.role;
+                session.user.status = token.status;
             }
             return session;
         }
