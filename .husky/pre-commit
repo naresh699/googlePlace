@@ -34,6 +34,6 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo "\n✅ All checks passed! Proceeding with commit..."
+echo "\n✅ Code is ready to push in github!"
 echo "==========================================="
 exit 0
