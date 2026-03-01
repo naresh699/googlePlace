@@ -27,6 +27,7 @@ export default function Home() {
   const [editingLead, setEditingLead] = useState(null);
   const [selectedLeadForDetails, setSelectedLeadForDetails] = useState(null);
   const [activeMarker, setActiveMarker] = useState(null);
+  const [mapZoom, setMapZoom] = useState(12);
   const [summarizingIds, setSummarizingIds] = useState(new Set());
 
   const { isLoaded } = useJsApiLoader({
@@ -58,6 +59,8 @@ export default function Home() {
     e.preventDefault();
     setLoading(true);
     setLeads([]);
+    setActiveMarker(null);
+    setMapZoom(12);
     try {
       const response = await fetch('/api/leads', {
         method: 'POST',
@@ -76,7 +79,7 @@ export default function Home() {
 
   const handleSummarize = async (leadId) => {
     if (summarizingIds.has(leadId)) return;
-    
+
     setSummarizingIds(prev => new Set(prev).add(leadId));
     try {
       const response = await fetch('/api/leads/summarize', {
@@ -86,10 +89,10 @@ export default function Home() {
       });
       const data = await response.json();
       if (data.error) throw new Error(data.error);
-      
-      setLeads(prevLeads => prevLeads.map(l => 
-        l.id === leadId 
-          ? { ...l, description: data.description, email: data.emailContent, antigravityPrompt: data.antigravityPrompt } 
+
+      setLeads(prevLeads => prevLeads.map(l =>
+        l.id === leadId
+          ? { ...l, description: data.description, email: data.emailContent, antigravityPrompt: data.antigravityPrompt }
           : l
       ));
 
@@ -333,16 +336,15 @@ export default function Home() {
                   <div
                     key={lead.id}
                     className="flex flex-col bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-indigo-100 transition-all duration-200 group relative"
-                    onMouseEnter={() => setActiveMarker(lead)}
                   >
                     <div className="flex-1 space-y-4">
                       <div>
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-black text-slate-900 text-lg leading-tight group-hover:text-[#4D3DF7] transition-colors line-clamp-2">{lead.name}</h3>
+                          <h3 className="font-black text-slate-900 text-xl leading-tight group-hover:text-[#4D3DF7] transition-colors line-clamp-2">{lead.name}</h3>
                           <button
                             onClick={() => {
                               setSelectedLeadForDetails(lead);
-                              if (lead.description.includes('Click "Summarize"')) {
+                              if (lead.description?.includes('Click "Summarize"')) {
                                 handleSummarize(lead.id);
                               }
                             }}
@@ -353,40 +355,51 @@ export default function Home() {
                           </button>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 mt-2">
-                          <span className="text-[10px] font-black text-[#4D3DF7] uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{lead.category.replace(/_/g, ' ')}</span>
-                          {lead.distance && <span className="text-[10px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{lead.distance} km</span>}
+                          <span className="text-xs font-black text-[#4D3DF7] uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{lead.category.replace(/_/g, ' ')}</span>
+                          {lead.distance && <span className="text-xs font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{lead.distance} km</span>}
                         </div>
-                        <p className="text-xs text-slate-400 mt-2 line-clamp-1">{lead.address}</p>
+                        <p className="text-sm text-slate-500 mt-2 line-clamp-2">{lead.address}</p>
                       </div>
 
-                      <div className="relative">
-                        <div className={`text-slate-600 text-xs leading-relaxed border-l-2 border-indigo-100 pl-3 py-1 italic min-h-[60px] line-clamp-3 transition-all ${summarizingIds.has(lead.id) ? 'animate-pulse blur-[1px]' : ''}`}>
-                          {lead.description}
-                        </div>
-                        {lead.description.includes('Click "Summarize"') && !summarizingIds.has(lead.id) && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleSummarize(lead.id); }}
-                            className="mt-2 w-full text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center justify-center gap-1 bg-indigo-50 px-2 py-1.5 rounded-lg border border-indigo-100 hover:border-indigo-200 transition-all active:scale-95"
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                            Summarize
-                          </button>
-                        )}
-                        {summarizingIds.has(lead.id) && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-[1px] rounded-lg">
-                            <div className="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
-                          </div>
-                        )}
+                      <div className="flex items-center gap-4 text-sm font-bold text-[#4D3DF7]">
+                        <button
+                          onClick={() => {
+                            setSelectedLeadForDetails(lead);
+                            if (lead.description?.includes('Click "Summarize"')) {
+                              handleSummarize(lead.id);
+                            }
+                          }}
+                          className="hover:underline hover:text-indigo-700 transition-all flex items-center gap-1"
+                        >
+                          <span>Details</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setActiveMarker(lead);
+                            setMapZoom(16);
+                          }}
+                          className="hover:underline hover:text-indigo-700 transition-all flex items-center gap-1"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                          <span>Show in map</span>
+                        </button>
                       </div>
 
                       <div className="space-y-3 pt-2">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 text-slate-700 font-bold text-[11px] truncate">
-                            <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                            {lead.phone}
-                          </div>
+                          {lead.phone ? (
+                            <a href={`tel:${lead.phone.replace(/\s+/g, '')}`} className="flex items-center gap-1.5 text-slate-700 hover:text-[#4D3DF7] font-bold text-sm truncate transition-colors">
+                              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                              {lead.phone}
+                            </a>
+                          ) : (
+                            <span className="flex items-center gap-1.5 text-slate-400 font-medium text-sm">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                              No phone
+                            </span>
+                          )}
                           <span
-                            className={`shrink-0 px-2 py-0.5 rounded text-[9px] font-black tracking-widest border ${lead.hasWebsite
+                            className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-black tracking-widest border ${lead.hasWebsite
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                               : 'bg-amber-50 text-amber-700 border-amber-100'
                               }`}
@@ -394,11 +407,11 @@ export default function Home() {
                             {lead.hasWebsite ? 'WEBSITE' : 'NO SITE'}
                           </span>
                         </div>
-                        
+
                         {lead.website && (
-                          <a href={lead.website} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 text-[#4D3DF7] hover:text-indigo-800 font-bold text-[11px] transition-colors bg-indigo-50/50 hover:bg-indigo-100 py-1.5 rounded-lg border border-transparent hover:border-indigo-100">
-                            <span className="truncate max-w-[150px]">{lead.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</span>
-                            <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                          <a href={lead.website} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 text-[#4D3DF7] hover:text-indigo-800 font-bold text-sm transition-colors bg-indigo-50/50 hover:bg-indigo-100 py-2 rounded-lg border border-transparent hover:border-indigo-100">
+                            <span className="truncate max-w-[200px]">{lead.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</span>
+                            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                           </a>
                         )}
                       </div>
@@ -408,11 +421,11 @@ export default function Home() {
                       <button
                         onClick={() => {
                           handleEdit(lead);
-                          if (lead.description.includes('Click "Summarize"')) {
+                          if (lead.description?.includes('Click "Summarize"')) {
                             handleSummarize(lead.id);
                           }
                         }}
-                        className="w-full bg-slate-900 text-white py-3 rounded-xl text-xs font-bold hover:bg-[#4D3DF7] transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+                        className="w-full bg-slate-900 text-white py-3 rounded-xl text-sm font-bold hover:bg-[#4D3DF7] transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
                         Outreach
@@ -454,7 +467,7 @@ export default function Home() {
                   <GoogleMap
                     mapContainerStyle={{ width: '100%', height: '100%' }}
                     center={mapCenter}
-                    zoom={12}
+                    zoom={mapZoom}
                     options={{
                       disableDefaultUI: false,
                       zoomControl: true,
@@ -487,7 +500,7 @@ export default function Home() {
         )}
 
         {/* Business Details Slide-over */}
-        <div 
+        <div
           className={`fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-[150] transform transition-transform duration-300 ease-in-out border-l border-slate-200 ${selectedLeadForDetails ? 'translate-x-0' : 'translate-x-full'}`}
         >
           {selectedLeadForDetails && (
@@ -495,7 +508,7 @@ export default function Home() {
               {/* Header */}
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Business Profile</h3>
-                <button 
+                <button
                   onClick={() => setSelectedLeadForDetails(null)}
                   className="p-2 text-slate-400 hover:text-slate-900 transition-colors bg-white rounded-xl shadow-sm border border-slate-200"
                 >
@@ -533,7 +546,13 @@ export default function Home() {
                         <div className="p-2 bg-slate-50 rounded-lg text-slate-400">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                         </div>
-                        <p className="text-slate-700 font-bold text-sm">{selectedLeadForDetails.phone}</p>
+                        {selectedLeadForDetails.phone ? (
+                          <a href={`tel:${selectedLeadForDetails.phone.replace(/\s+/g, '')}`} className="text-[#4D3DF7] font-bold text-sm hover:underline">
+                            {selectedLeadForDetails.phone}
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 font-medium text-sm">No phone</span>
+                        )}
                       </div>
                       {selectedLeadForDetails.website && (
                         <div className="flex items-center gap-3">
@@ -597,7 +616,7 @@ export default function Home() {
 
         {/* Backdrop for Slide-over */}
         {selectedLeadForDetails && (
-          <div 
+          <div
             className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-[140] transition-opacity duration-300"
             onClick={() => setSelectedLeadForDetails(null)}
           />
